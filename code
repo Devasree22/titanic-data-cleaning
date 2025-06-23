@@ -1,0 +1,57 @@
+# Import libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+
+# Step 1: Load Dataset
+df = pd.read_csv("titanic.csv")  # Replace with your actual file path
+
+# Step 2: Drop irrelevant or sparse columns
+df_cleaned = df.drop(columns=["Name", "Ticket", "Cabin"])
+
+# Step 3: Handle missing values
+# Age → median
+age_imputer = SimpleImputer(strategy="median")
+df_cleaned["Age"] = age_imputer.fit_transform(df_cleaned[["Age"]])
+
+# Embarked → most frequent
+embarked_imputer = SimpleImputer(strategy="most_frequent")
+df_cleaned["Embarked"] = embarked_imputer.fit_transform(df_cleaned[["Embarked"]])
+
+# Step 4: Encode categorical features
+label_encoders = {}
+for col in ["Sex", "Embarked"]:
+    le = LabelEncoder()
+    df_cleaned[col] = le.fit_transform(df_cleaned[col])
+    label_encoders[col] = le  # save encoder if needed later
+
+# Step 5: Standardize numerical features (excluding 'Survived')
+numerical_cols = df_cleaned.select_dtypes(include=["int64", "float64"]).columns.drop("Survived")
+scaler = StandardScaler()
+df_cleaned[numerical_cols] = scaler.fit_transform(df_cleaned[numerical_cols])
+
+# Step 6: Visualize boxplots to see outliers
+plt.figure(figsize=(15, 8))
+for i, col in enumerate(numerical_cols, 1):
+    plt.subplot(2, 4, i)
+    sns.boxplot(y=df_cleaned[col])
+    plt.title(f'Boxplot of {col}')
+plt.tight_layout()
+plt.show()
+
+# Step 7: Remove outliers using IQR method
+def remove_outliers_iqr(data, columns):
+    df_out = data.copy()
+    for col in columns:
+        Q1 = df_out[col].quantile(0.25)
+        Q3 = df_out[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df_out = df_out[(df_out[col] >= lower_bound) & (df_out[col] <= upper_bound)]
+    return df_out
+
+df_final = remove_outliers_iqr(df_cleaned, numerical_cols)
